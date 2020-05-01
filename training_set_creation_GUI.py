@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QSizePolicy
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from utils.patch_navigator import PatchNavigator
+from utils.training_set_extraction import PatchNavigator
 
 
 def parse_args():
@@ -102,7 +102,7 @@ class PlotCanvas(FigureCanvas):
 
     def plot_mask(self):
         self.axes.cla()
-        self.axes.imshow(patch_navigator.curr_mask, cmap='gray', vmin=0, vmax=1)
+        self.axes.imshow(patch_navigator.curr_mask, cmap='gray', vmin=0, vmax=255)
         self.draw()
 
     def plot_scene(self):
