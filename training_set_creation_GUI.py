@@ -60,7 +60,7 @@ class App(QMainWindow):
             self.plot_patches()
 
         elif event.key() == QtCore.Qt.Key_R:
-            patch_navigator.next_row()
+            patch_navigator.next_col()
             self.plot_patches()
 
     def init_ui(self):

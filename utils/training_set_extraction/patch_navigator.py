@@ -7,7 +7,7 @@ import numpy as np
 import rasterio
 from rasterio.windows import Window
 
-from utils.extract_sea_ice import extract_sea_ice
+from .extract_sea_ice import extract_sea_ice
 
 
 class PatchNavigator:
@@ -70,7 +70,7 @@ class PatchNavigator:
             window = Window(col_off, row_off, self.patch_size, self.patch_size)
             self.curr_patch = src.read(window=window)[0, :, :]
             curr_patch_norm = cv2.normalize(self.curr_patch, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX,
-                                            dtype=cv2.CV_8U)
+                                            dtype=cv2.CV_8UC1)
 
             self.curr_mask = self.mask_func(curr_patch_norm)
 
@@ -105,7 +105,7 @@ class PatchNavigator:
             self.next_scene()
 
         else:
-            self.i += 5
+            self.i += 2
             if self.i > self.max_i:
                 self.i = 0
                 self.j += 1
@@ -114,7 +114,7 @@ class PatchNavigator:
         if np.min(self.curr_patch) == 0:
             self.next_cell()
 
-    def next_row(self):
+    def next_col(self):
         if self.i == self.max_i and self.j == self.max_j:
             print('Last cell, changing scene')
         elif self.j == self.max_j:
