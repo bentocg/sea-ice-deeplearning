@@ -2,7 +2,6 @@ import os
 import sys
 from argparse import ArgumentParser
 
-import matplotlib.pyplot as plt
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSizePolicy, QWidget, QVBoxLayout, QLabel
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -24,6 +23,8 @@ class App(QMainWindow):
     def __init__(self):
         super().__init__()
         self.title = 'Sea ice extraction GUI'
+        self.setStyleSheet("background-color: white;"
+                           "font: 14pt;")
         self.left = 10
         self.top = 10
         self.width = 1980
@@ -36,9 +37,20 @@ class App(QMainWindow):
         self.info.setGeometry(QtCore.QRect(650, 10, 1000, 400))
         self.info.setObjectName("info")
         info_layout = QVBoxLayout()
-        lab1 = QLabel(f'Scene {patch_navigator.scn_idx + 1} out of {len(patch_navigator.scn_list)}')
-        lab2 = QLabel(os.path.basename(patch_navigator.input_scn))
-        for lab in [lab2, lab1]:
+        tooltip = QLabel(f'<h1>Current scene:</h1> <br />{os.path.basename(patch_navigator.input_scn)}' +
+                         f'<br /> (Scene {patch_navigator.scn_idx + 1} out of {len(patch_navigator.scn_list)})')
+        list_of_commands = QLabel('<h1>List of commands:</h1>' +
+                                  '<ul>'
+                                  '<li>K: keep predicted mask and advance to next patch </li>'
+                                  '<li>J: treat patch as negative and advance to next patch</li>'
+                                  '<li>P: treat patch as positive and advance to next patch</li>'
+                                  '<li>R: next column</li>'
+                                  '<li>S: next scene</li>'
+                                  '<li>A: previous scene</li>'
+                                  '<li>ESC: close application</li>'
+                                  '</ul>')
+        for lab in [tooltip, list_of_commands]:
+            lab.setTextFormat(QtCore.Qt.RichText)
             info_layout.addWidget(lab)
         self.info.setLayout(info_layout)
         self.init_ui()
