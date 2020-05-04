@@ -39,6 +39,7 @@ class PatchNavigator:
         self.curr_scn = None
         self.curr_patch = None
         self.curr_mask = None
+        self.curr_outline = None
         self.pos_mask = np.ones([self.patch_size, self.patch_size], dtype=np.uint8) * 255
         self.neg_mask = np.zeros([self.patch_size, self.patch_size], dtype=np.uint8)
 
@@ -52,7 +53,7 @@ class PatchNavigator:
         self.next_cell()
 
         # create output dir
-        for subdir in ['x', 'y']:
+        for subdir in ['x', 'y_mask', 'y_outline']:
             os.makedirs(f"{self.out_dir}/{subdir}", exist_ok=True)
 
     def load_scene(self):
@@ -71,8 +72,9 @@ class PatchNavigator:
             self.curr_patch = src.read(window=window)[0, :, :]
             curr_patch_norm = cv2.normalize(self.curr_patch, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX,
                                             dtype=cv2.CV_8UC1)
-
-            self.curr_mask = self.mask_func(curr_patch_norm)
+            processed = self.mask_func(curr_patch_norm)
+            self.curr_mask = processed['mask']
+            self.curr_outline = processed['outline']
 
     def find_bounds(self):
         with rasterio.open(self.input_scn) as src:
@@ -148,9 +150,12 @@ class PatchNavigator:
         fname = f"{os.path.basename(self.input_scn).split('.')[0]}_{self.i}_{self.j}.tif"
         cv2.imwrite(f"{self.out_dir}/x/{fname}", self.curr_patch)
         if label == 'keep':
-            cv2.imwrite(f"{self.out_dir}/y/{fname}", self.curr_mask)
+            cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.curr_mask)
+            cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.curr_outline)
         if label == 'positive':
-            cv2.imwrite(f"{self.out_dir}/y/{fname}", self.pos_mask)
+            cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.pos_mask)
+            cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
         elif label == 'negative':
-            cv2.imwrite(f"{self.out_dir}/y/{fname}", self.neg_mask)
+            cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.neg_mask)
+            cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
         self.next_cell()

@@ -1,8 +1,10 @@
+import os
 import sys
 from argparse import ArgumentParser
 
+import matplotlib.pyplot as plt
 from PyQt5 import QtCore
-from PyQt5.QtWidgets import QApplication, QMainWindow, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QMainWindow, QSizePolicy, QWidget, QVBoxLayout, QLabel
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -21,14 +23,24 @@ class App(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.title = 'Sea ice extraction GUI'
         self.left = 10
         self.top = 10
-        self.title = 'PyQt5 matplotlib example - pythonspot.com'
         self.width = 1980
         self.height = 1080
-        self.patch = PlotCanvas(self, width=10, height=8)
-        self.mask = PlotCanvas(self, width=10, height=8)
-        self.scene = PlotCanvas(self, width=10, height=8)
+        self.patch = PlotCanvas(self, width=8, height=8)
+        self.mask = PlotCanvas(self, width=8, height=8)
+        self.outline = PlotCanvas(self, width=8, height=8)
+        self.scene = PlotCanvas(self, width=8, height=8)
+        self.info = QWidget(self)
+        self.info.setGeometry(QtCore.QRect(650, 10, 1000, 400))
+        self.info.setObjectName("info")
+        info_layout = QVBoxLayout()
+        lab1 = QLabel(f'Scene {patch_navigator.scn_idx + 1} out of {len(patch_navigator.scn_list)}')
+        lab2 = QLabel(os.path.basename(patch_navigator.input_scn))
+        for lab in [lab2, lab1]:
+            info_layout.addWidget(lab)
+        self.info.setLayout(info_layout)
         self.init_ui()
 
     def keyPressEvent(self, event):
@@ -72,13 +84,16 @@ class App(QMainWindow):
     def plot_patches(self):
 
         self.patch.plot_patch()
-        self.patch.move(0, 450)
+        self.patch.move(0, 470)
+
+        self.outline.plot_outline()
+        self.outline.move(500, 470)
 
         self.mask.plot_mask()
-        self.mask.move(600, 450)
+        self.mask.move(1040, 470)
 
         self.scene.plot_scene()
-        self.scene.move(0, -70)
+        self.scene.move(0, -40)
 
 
 class PlotCanvas(FigureCanvas):
@@ -97,16 +112,25 @@ class PlotCanvas(FigureCanvas):
 
     def plot_patch(self):
         self.axes.cla()
+        self.axes.title.set_text('Raw patch')
         self.axes.imshow(patch_navigator.curr_patch, cmap='gray', vmin=0, vmax=255)
         self.draw()
 
     def plot_mask(self):
         self.axes.cla()
+        self.axes.title.set_text('Watershed mask')
         self.axes.imshow(patch_navigator.curr_mask, cmap='gray', vmin=0, vmax=255)
+        self.draw()
+
+    def plot_outline(self):
+        self.axes.cla()
+        self.axes.title.set_text('Watershed outline')
+        self.axes.imshow(patch_navigator.curr_outline, cmap='gray', vmin=0, vmax=255)
         self.draw()
 
     def plot_scene(self):
         self.axes.cla()
+        self.axes.title.set_text('Entire scene')
         self.axes.imshow(patch_navigator.curr_scn, cmap='gray', vmin=0, vmax=255)
         self.axes.plot([patch_navigator.j * patch_navigator.patch_size / patch_navigator.scn_ratio[0]],
                        [patch_navigator.i * patch_navigator.patch_size / patch_navigator.scn_ratio[1]], 'rs',
