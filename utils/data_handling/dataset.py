@@ -1,17 +1,22 @@
-from os.path import splitext
-from os import listdir
-import numpy as np
-from glob import glob
-import torch
-from torch.utils.data import Dataset
 import logging
+from glob import glob
+from os import listdir
+from os.path import splitext
+
+import numpy as np
+import torch
 from PIL import Image
+from torch.utils.data import Dataset
 
 
 class BasicDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, scale=1):
+    def __init__(self, imgs_dir, masks_dir,  outline_dir=None, scale=1):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
+        if outline_dir:
+            self.outline_dir = outline_dir
+        else:
+            self.outline_dir = None
         self.scale = scale
         assert 0 < scale <= 1, 'Scale must be between 0 and 1'
 
@@ -43,13 +48,14 @@ class BasicDataset(Dataset):
 
     def __getitem__(self, i):
         idx = self.ids[i]
-        mask_file = glob(self.masks_dir + idx + '*')
-        img_file = glob(self.imgs_dir + idx + '*')
+        mask_file = glob(self.masks_dir + idx + '.tif')
+        img_file = glob(self.imgs_dir + idx + '.tif')
 
         assert len(mask_file) == 1, \
             f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
         assert len(img_file) == 1, \
             f'Either no image or multiple images found for the ID {idx}: {img_file}'
+
         mask = Image.open(mask_file[0])
         img = Image.open(img_file[0])
 
@@ -59,4 +65,15 @@ class BasicDataset(Dataset):
         img = self.preprocess(img, self.scale)
         mask = self.preprocess(mask, self.scale)
 
-        return {'image': torch.from_numpy(img).float(), 'mask': torch.from_numpy(mask).float()}
+        if self.outline_dir:
+            outline_file = glob(self.outline_dir + idx + '.tif')
+            assert len(outline_file) == 1, \
+                f'Either no outline or multiple outlines found for the ID {idx}: {outline_file}'
+            outline = Image.open(outline_file[0])
+            outline = self.preprocess(outline, self.scale)
+
+        else:
+            outline = np.zeros(mask.shape)
+
+        return {'image': torch.from_numpy(img).float(), 'mask': torch.from_numpy(mask).float(),
+                'outline': torch.from_numpy(outline).float()}

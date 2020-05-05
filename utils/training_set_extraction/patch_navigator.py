@@ -152,10 +152,10 @@ class PatchNavigator:
         if label == 'keep':
             cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.curr_mask)
             cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.curr_outline)
-        if label == 'positive':
+        elif label == 'positive':
             cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.pos_mask)
             cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
-        elif label == 'negative':
+        else:
             cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.neg_mask)
             cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
         self.next_cell()

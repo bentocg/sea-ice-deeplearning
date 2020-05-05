@@ -24,7 +24,8 @@ class App(QMainWindow):
         super().__init__()
         self.title = 'Sea ice extraction GUI'
         self.setStyleSheet("background-color: white;"
-                           "font: 14pt;")
+                           "font: 14pt 'Droid Sans';"
+                           "")
         self.left = 10
         self.top = 10
         self.width = 1980
@@ -34,26 +35,35 @@ class App(QMainWindow):
         self.outline = PlotCanvas(self, width=8, height=8)
         self.scene = PlotCanvas(self, width=8, height=8)
         self.info = QWidget(self)
-        self.info.setGeometry(QtCore.QRect(650, 10, 1000, 400))
+        self.info.setGeometry(QtCore.QRect(650, -40, 600, 500))
         self.info.setObjectName("info")
         info_layout = QVBoxLayout()
-        tooltip = QLabel(f'<h1>Current scene:</h1> <br />{os.path.basename(patch_navigator.input_scn)}' +
-                         f'<br /> (Scene {patch_navigator.scn_idx + 1} out of {len(patch_navigator.scn_list)})')
+        self.scn_tooltip = QLabel(f'<h1>Current scene:</h1> <br />{os.path.basename(patch_navigator.input_scn)}'
+                                  f'<br /> (Scene {patch_navigator.scn_idx + 1} out of '
+                                  f'{len(patch_navigator.scn_list)})')
         list_of_commands = QLabel('<h1>List of commands:</h1>' +
                                   '<ul>'
                                   '<li>K: keep predicted mask and advance to next patch </li>'
                                   '<li>J: treat patch as negative and advance to next patch</li>'
                                   '<li>P: treat patch as positive and advance to next patch</li>'
+                                  '<li>Spacebar: jump two patches</li>'
                                   '<li>R: next column</li>'
                                   '<li>S: next scene</li>'
                                   '<li>A: previous scene</li>'
-                                  '<li>ESC: close application</li>'
+                                  '<li>Esc: close application</li>'
                                   '</ul>')
-        for lab in [tooltip, list_of_commands]:
+        list_of_commands.setStyleSheet("border:2px ridge rgb(0, 0, 0); ")
+
+        for lab in [self.scn_tooltip, list_of_commands]:
             lab.setTextFormat(QtCore.Qt.RichText)
             info_layout.addWidget(lab)
         self.info.setLayout(info_layout)
         self.init_ui()
+
+    def update_scene_label(self):
+        self.scn_tooltip.setText(f'<h1>Current scene:</h1> <br />{os.path.basename(patch_navigator.input_scn)}' +
+                                 f'<br /> (Scene {patch_navigator.scn_idx + 1} out of '
+                                 f'{len(patch_navigator.scn_list)})')
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_K:
@@ -78,10 +88,12 @@ class App(QMainWindow):
         elif event.key() == QtCore.Qt.Key_S:
             patch_navigator.next_scene()
             self.plot_patches()
+            self.update_scene_label()
 
         elif event.key() == QtCore.Qt.Key_A:
             patch_navigator.previous_scene()
             self.plot_patches()
+            self.update_scene_label()
 
         elif event.key() == QtCore.Qt.Key_R:
             patch_navigator.next_col()
