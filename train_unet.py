@@ -13,10 +13,12 @@ from tqdm import tqdm
 from eval import eval_net
 from utils.data_handling import BasicDataset
 from utils.models import UNet
-from dice_loss import DiceCoeff
+from utils.data_handling import get_training_augmentation, get_validation_augmentation
 
-dir_img = 'training_set/x/'
-dir_mask = 'training_set/y_mask/'
+dir_img_train = 'training_set/training/x/'
+dir_mask_train = 'training_set/training/y_mask/'
+dir_img_val = 'training_set/validation/x/'
+dir_mask_val = 'training_set/validation/y_mask/'
 dir_checkpoint = 'checkpoints/'
 
 
@@ -25,17 +27,16 @@ def train_net(net,
               epochs=5,
               batch_size=1,
               lr=0.001,
-              val_percent=0.1,
               save_cp=True,
-              img_scale=0.5):
-    dataset = BasicDataset(dir_img, dir_mask, scale=img_scale)
-    n_val = int(len(dataset) * val_percent)
-    n_train = len(dataset) - n_val
-    train, val = random_split(dataset, [n_train, n_val])
+              img_size=256):
+    train = BasicDataset(dir_img_train, dir_mask_train, augmentation=get_training_augmentation(img_size))
+    val = BasicDataset(dir_img_val, dir_mask_val, augmentation=get_validation_augmentation(img_size))
+    n_train, n_val = len(train), len(val)
+
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
     val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
-    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
+    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SIZE_{img_size}')
     global_step = 0
 
     logging.info(f'''Starting training:
@@ -46,15 +47,12 @@ def train_net(net,
         Validation size: {n_val}
         Checkpoints:     {save_cp}
         Device:          {device.type}
-        Images scaling:  {img_scale}
+        Images size:  {img_size}
     ''')
 
     optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-8)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=2)
-    if net.n_classes > 1:
-        criterion = nn.CrossEntropyLoss()
-    else:
-        criterion = nn.SmoothL1Loss()
+    criterion = nn.BCEWithLogitsLoss()
 
     for epoch in range(epochs):
         net.train()
@@ -87,7 +85,7 @@ def train_net(net,
 
                 pbar.update(imgs.shape[0])
                 global_step += 1
-                if global_step % (len(dataset) // (10 * batch_size)) == 0:
+                if global_step % ((n_train + n_val) // (10 * batch_size)) == 0:
                     for tag, value in net.named_parameters():
                         tag = tag.replace('.', '/')
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
@@ -132,10 +130,8 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')
-    parser.add_argument('-s', '--scale', dest='scale', type=float, default=0.5,
-                        help='Downscaling factor of the images')
-    parser.add_argument('-v', '--validation', dest='val', type=float, default=10.0,
-                        help='Percent of the data that is used as validation (0-100)')
+    parser.add_argument('-s', '--img_size', dest='size', type=int, default=256,
+                        help='Final size of images')
 
     return parser.parse_args()
 
@@ -168,8 +164,7 @@ if __name__ == '__main__':
                   batch_size=args.batchsize,
                   lr=args.lr,
                   device=device,
-                  img_scale=args.scale,
-                  val_percent=args.val / 100)
+                  img_size=args.size)
     except KeyboardInterrupt:
         torch.save(net.state_dict(), 'INTERRUPTED.pth')
         logging.info('Saved interrupt')

@@ -35,7 +35,7 @@ class App(QMainWindow):
         self.outline = PlotCanvas(self, width=8, height=8)
         self.scene = PlotCanvas(self, width=8, height=8)
         self.info = QWidget(self)
-        self.info.setGeometry(QtCore.QRect(650, -40, 600, 500))
+        self.info.setGeometry(QtCore.QRect(650, -20, 600, 500))
         self.info.setObjectName("info")
         info_layout = QVBoxLayout()
         self.scn_tooltip = QLabel(f'<h1>Current scene:</h1> <br />{os.path.basename(patch_navigator.input_scn)}'
@@ -52,7 +52,11 @@ class App(QMainWindow):
                                   '<li>A: previous scene</li>'
                                   '<li>Esc: close application</li>'
                                   '</ul>')
-        list_of_commands.setStyleSheet("border:2px ridge rgb(0, 0, 0); ")
+        list_of_commands.setStyleSheet("border-style: solid;"
+                                       "padding: 25px;"
+                                       "border-radius: 15px;"
+                                       "border-width: 4px;"
+                                       "border-color: rgb(0, 0, 0); ")
 
         for lab in [self.scn_tooltip, list_of_commands]:
             lab.setTextFormat(QtCore.Qt.RichText)
@@ -111,10 +115,10 @@ class App(QMainWindow):
         self.patch.move(0, 470)
 
         self.outline.plot_outline()
-        self.outline.move(500, 470)
+        self.outline.move(540, 470)
 
         self.mask.plot_mask()
-        self.mask.move(1040, 470)
+        self.mask.move(1080, 470)
 
         self.scene.plot_scene()
         self.scene.move(0, -40)
