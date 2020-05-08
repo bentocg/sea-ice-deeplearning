@@ -16,15 +16,17 @@ from utils.models import UNet
 from utils.data_handling import get_training_augmentation, get_validation_augmentation
 
 dir_img_train = 'training_set/training/x/'
-dir_mask_train = 'training_set/training/y_outline/'
+dir_mask_train = 'training_set/training/y_mask/'
 dir_img_val = 'training_set/validation/x/'
-dir_mask_val = 'training_set/validation/y_outline/'
+dir_mask_val = 'training_set/validation/y_mask/'
 dir_checkpoint = 'checkpoints/'
 
 
 def train_net(net,
               device,
               epochs=5,
+              thresh=0.8,
+              pos_weight=5.0,
               batch_size=1,
               lr=0.001,
               save_cp=True,
@@ -45,14 +47,15 @@ def train_net(net,
         Learning rate:   {lr}
         Training size:   {n_train}
         Validation size: {n_val}
+        Threshold:       {thresh}
         Checkpoints:     {save_cp}
         Device:          {device.type}
         Images size:  {img_size}
     ''')
 
     optimizer = optim.Adam(net.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=15)
-    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.FloatTensor([1.5]).cuda())
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=15)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.FloatTensor([pos_weight]).cuda())
 
     for epoch in range(epochs):
         net.train()
@@ -62,14 +65,9 @@ def train_net(net,
             for batch in train_loader:
                 imgs = batch['image']
                 true_masks = batch['mask']
-                assert imgs.shape[1] == net.n_channels, \
-                    f'Network has been defined with {net.n_channels} input channels, ' \
-                    f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
-                    'the images are loaded correctly.'
 
                 imgs = imgs.to(device=device, dtype=torch.float32)
-                mask_type = torch.float32 if net.n_classes == 1 else torch.long
-                true_masks = true_masks.to(device=device, dtype=mask_type)
+                true_masks = true_masks.to(device=device, dtype=torch.float32)
 
                 masks_pred = net(imgs)
                 loss = criterion(masks_pred, true_masks)
@@ -93,18 +91,15 @@ def train_net(net,
                     val_score = eval_net(net, val_loader, device)
                     scheduler.step(val_score)
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
-
-                    if net.n_classes > 1:
-                        logging.info('Validation cross entropy: {}'.format(val_score))
-                        writer.add_scalar('Loss/test', val_score, global_step)
-                    else:
-                        logging.info('Validation Dice Coeff: {}'.format(val_score))
-                        writer.add_scalar('Dice/test', val_score, global_step)
+                    pred = torch.sigmoid(masks_pred)
+                    pred = (pred > 0.8).float()
+                    logging.info('Validation Dice Coeff: {}'.format(val_score))
+                    writer.add_scalar('Dice/test', val_score, global_step)
 
                     writer.add_images('images', 1 - imgs, global_step)
-                    if net.n_classes == 1:
-                        writer.add_images('masks/true', true_masks, global_step)
-                        writer.add_images('masks/pred', masks_pred, global_step)
+
+                    writer.add_images('masks/true', true_masks, global_step)
+                    writer.add_images('masks/pred', pred, global_step)
 
         if save_cp:
             try:
@@ -142,11 +137,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    net = UNet(n_channels=1, n_classes=1, bilinear=True)
-    logging.info(f'Network:\n'
-                 f'\t{net.n_channels} input channels\n'
-                 f'\t{net.n_classes} output channels (classes)\n'
-                 f'\t{"Bilinear" if net.bilinear else "Transposed conv"} upscaling')
+    net = UNet(n_channels=1, n_classes=1)
 
     if args.load:
         net.load_state_dict(
@@ -155,6 +146,7 @@ if __name__ == '__main__':
         logging.info(f'Model loaded from {args.load}')
 
     net.to(device=device)
+    net = torch.nn.DataParallel(net)
     # faster convolutions, but more memory
     # cudnn.benchmark = True
 
