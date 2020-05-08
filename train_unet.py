@@ -16,9 +16,9 @@ from utils.models import UNet
 from utils.data_handling import get_training_augmentation, get_validation_augmentation
 
 dir_img_train = 'training_set/training/x/'
-dir_mask_train = 'training_set/training/y_mask/'
+dir_mask_train = 'training_set/training/y_outline/'
 dir_img_val = 'training_set/validation/x/'
-dir_mask_val = 'training_set/validation/y_mask/'
+dir_mask_val = 'training_set/validation/y_outline/'
 dir_checkpoint = 'checkpoints/'
 
 
@@ -50,9 +50,9 @@ def train_net(net,
         Images size:  {img_size}
     ''')
 
-    optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-8)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=2)
-    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(net.parameters(), lr=lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=15)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.FloatTensor([1.5]).cuda())
 
     for epoch in range(epochs):
         net.train()
@@ -101,10 +101,10 @@ def train_net(net,
                         logging.info('Validation Dice Coeff: {}'.format(val_score))
                         writer.add_scalar('Dice/test', val_score, global_step)
 
-                    writer.add_images('images', imgs, global_step)
+                    writer.add_images('images', 1 - imgs, global_step)
                     if net.n_classes == 1:
                         writer.add_images('masks/true', true_masks, global_step)
-                        writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
+                        writer.add_images('masks/pred', masks_pred, global_step)
 
         if save_cp:
             try:

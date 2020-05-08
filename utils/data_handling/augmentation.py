@@ -15,25 +15,26 @@ def hard_transforms():
     result = [
         # miscelaneous
         A.IAAAdditiveGaussianNoise(p=0.2),
+        A.Blur(blur_limit=3, p=0.2)
         #A.CoarseDropout(max_holes=10, max_height=50, max_width=50, min_height=15, min_width=15, p=0.25),
 
         # brightness
-        #A.OneOf(
-        #    [
-        #        A.RandomBrightnessContrast(p=1),
-        #        A.RandomGamma(p=1),
-        #    ],
-        #    p=0.9,
-        #),
+        # A.OneOf(
+        #     [
+        #         A.RandomBrightnessContrast(p=1),
+        #         A.RandomGamma(p=1),
+        #     ],
+        #     p=0.9,
+        # ),
 
         # sharpening / blurring
-        A.OneOf(
-            [
-                A.IAASharpen(p=1),
-                A.Blur(blur_limit=3, p=1),
-            ],
-            p=0.9,
-        ),
+        # A.OneOf(
+        #     [
+        #         A.IAASharpen(p=1),
+        #         A.Blur(blur_limit=3, p=1),
+        #     ],
+        #     p=0.9,
+        # ),
 
         #
     ]
@@ -47,7 +48,7 @@ def resize_transforms(input_size=256):
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=1),
-        A.OneOf([A.ShiftScaleRotate(scale_limit=0, rotate_limit=(-45, 45), shift_limit=(-0.1, 0.1),
+        A.OneOf([A.ShiftScaleRotate(scale_limit=(0.8, 1.2), rotate_limit=(-45, 45), shift_limit=(-0.1, 0.1),
                                     interpolation=0, border_mode=2, p=0.5),
                  A.ElasticTransform(alpha_affine=20, sigma=30, border_mode=2, p=0.5)]),
         A.PadIfNeeded(min_height=input_size, min_width=input_size, always_apply=True, border_mode=2),

@@ -47,6 +47,9 @@ class BasicDataset(Dataset):
 
         mask =self.preprocess(Image.open(mask_file[0]))
         img = self.preprocess(Image.open(img_file[0]))
+        mask[mask < 200] = 0
+        mask[mask > 0] = 1
+
 
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
@@ -62,7 +65,9 @@ class BasicDataset(Dataset):
 
         if self.augmentation:
             sample = self.augmentation(image=img, mask=mask)
-            return {'image': sample['image'].transpose((2, 0, 1)), 'mask': sample['mask'].transpose((2, 0, 1))}
+            return {'image': sample['image'].transpose(2, 0, 1).astype('float32'),
+                    'mask': sample['mask'].transpose(2, 0, 1).astype('float32')}
 
         else:
-            return {'image': torch.from_numpy(img).float(), 'mask': torch.from_numpy(mask).float()}
+            return {'image': torch.from_numpy(img).transpose(2, 0, 1).astype('float32'),
+                    'mask': torch.from_numpy(mask).transpose(2, 0, 1).astype('float32')}
