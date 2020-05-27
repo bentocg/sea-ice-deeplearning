@@ -35,7 +35,7 @@ class App(QMainWindow):
         self.outline = PlotCanvas(self, width=8, height=8)
         self.scene = PlotCanvas(self, width=8, height=8)
         self.info = QWidget(self)
-        self.info.setGeometry(QtCore.QRect(650, -20, 600, 500))
+        self.info.setGeometry(QtCore.QRect(650, -20, 700, 500))
         self.info.setObjectName("info")
         info_layout = QVBoxLayout()
         self.scn_tooltip = QLabel(f'<h1>Current scene:</h1> <br />{os.path.basename(patch_navigator.input_scn)}'
@@ -46,8 +46,10 @@ class App(QMainWindow):
                                   '<li>K: keep predicted mask and advance to next patch </li>'
                                   '<li>J: treat patch as negative and advance to next patch</li>'
                                   '<li>P: treat patch as positive and advance to next patch</li>'
+                                  '<li>Z: undo last patch </li>'
                                   '<li>Spacebar: jump two patches</li>'
                                   '<li>R: next column</li>'
+                                  '<li>T: previous column</li>'
                                   '<li>S: next scene</li>'
                                   '<li>A: previous scene</li>'
                                   '<li>Esc: close application</li>'
@@ -82,6 +84,10 @@ class App(QMainWindow):
             patch_navigator.write_patch('positive')
             self.plot_patches()
 
+        elif event.key() == QtCore.Qt.Key_Z:
+            patch_navigator.write_patch('undo')
+            self.plot_patches()
+
         elif event.key() == QtCore.Qt.Key_Space:
             patch_navigator.skip_cells()
             self.plot_patches()
@@ -101,6 +107,10 @@ class App(QMainWindow):
 
         elif event.key() == QtCore.Qt.Key_R:
             patch_navigator.next_col()
+            self.plot_patches()
+
+        elif event.key() == QtCore.Qt.Key_T:
+            patch_navigator.previous_col()
             self.plot_patches()
 
     def init_ui(self):

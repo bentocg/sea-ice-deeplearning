@@ -26,7 +26,7 @@ def train_net(net,
               device,
               epochs=5,
               thresh=0.8,
-              pos_weight=5.0,
+              pos_weight=50.0,
               batch_size=1,
               lr=0.001,
               save_cp=True,
@@ -54,9 +54,8 @@ def train_net(net,
     ''')
 
     optimizer = optim.Adam(net.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=15)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=25)
     criterion = nn.BCEWithLogitsLoss(pos_weight=torch.FloatTensor([pos_weight]).cuda())
-
     for epoch in range(epochs):
         net.train()
 

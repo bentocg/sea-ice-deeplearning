@@ -6,13 +6,14 @@ import cv2
 import numpy as np
 import rasterio
 from rasterio.windows import Window
+from functools import partial
 
 from .extract_sea_ice import extract_sea_ice
 
 
 class PatchNavigator:
     def __init__(self, scenes_dir: str, patch_size: int, scn_res: tuple, out_dir: str,
-                 masking_function=extract_sea_ice):
+                 masking_function=partial(extract_sea_ice, get_outline=True)):
         # define attributes
         self.out_dir = out_dir
         self.mask_func = masking_function
@@ -43,6 +44,9 @@ class PatchNavigator:
         self.pos_mask = np.ones([self.patch_size, self.patch_size], dtype=np.uint8) * 255
         self.neg_mask = np.zeros([self.patch_size, self.patch_size], dtype=np.uint8)
 
+        # last patch created
+        self.last = None
+
         # load_scene
         self.load_scene()
 
@@ -55,6 +59,11 @@ class PatchNavigator:
         # create output dir
         for subdir in ['x', 'y_mask', 'y_outline']:
             os.makedirs(f"{self.out_dir}/{subdir}", exist_ok=True)
+
+        # create log
+        if not os.path.exists(f'{self.out_dir}/log.csv'):
+            with open(f'{self.out_dir}/log.csv', 'w') as file:
+                file.write('filename,label')
 
     def load_scene(self):
         self.input_scn = self.scn_list[self.scn_idx]
@@ -126,6 +135,16 @@ class PatchNavigator:
             self.j += 1
             self.next_cell()
 
+    def previous_col(self):
+        if self.i == 0 and self.j == 0:
+            print('Last cell, changing scene')
+        elif self.j == 0:
+            print('Last row, please advance cells instead')
+        else:
+            self.i = -1
+            self.j -= 1
+            self.next_cell()
+
     def next_scene(self):
         if self.scn_idx == len(self.scn_list):
             print('last scene. closing app')
@@ -147,15 +166,33 @@ class PatchNavigator:
             self.next_cell()
 
     def write_patch(self, label):
-        fname = f"{os.path.basename(self.input_scn).split('.')[0]}_{self.i}_{self.j}.tif"
-        cv2.imwrite(f"{self.out_dir}/x/{fname}", self.curr_patch)
-        if label == 'keep':
-            cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.curr_mask)
-            cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.curr_outline)
-        elif label == 'positive':
-            cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.pos_mask)
-            cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
+        if label == 'undo':
+            if self.last:
+                os.remove(f"{self.out_dir}/x/{self.last}")
+                os.remove(f"{self.out_dir}/y_mask/{self.last}")
+                os.remove(f"{self.out_dir}/y_outline/{self.last}")
+                with open(f'{self.out_dir}/log.csv', "r+") as file:
+                    lines = file.readlines()
+                    file.seek(0)
+                    for line in lines:
+                        if self.last not in line:
+                            file.write(line)
+                    file.truncate()
+                self.last = None
         else:
-            cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.neg_mask)
-            cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
-        self.next_cell()
+            fname = f"{os.path.basename(self.input_scn).split('.')[0]}_{self.i}_{self.j}.tif"
+            cv2.imwrite(f"{self.out_dir}/x/{fname}", self.curr_patch)
+            self.last = fname
+            with open(f'{self.out_dir}/log.csv', 'a') as file:
+                file.write(f'\n{fname},{label}')
+            if label == 'keep':
+                cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.curr_mask)
+                cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.curr_outline)
+            elif label == 'positive':
+                cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.pos_mask)
+                cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
+            else:
+                cv2.imwrite(f"{self.out_dir}/y_mask/{fname}", self.neg_mask)
+                cv2.imwrite(f"{self.out_dir}/y_outline/{fname}", self.neg_mask)
+
+            self.next_cell()

@@ -9,19 +9,7 @@ import cv2
 import numpy as np
 
 
-def extract_sea_ice(img, kernel_size=9, add_centroids=False):
-    """
-    Helper function to extract sea ice masks from panchromatic imagery
-    Parameters
-    ----------
-    img: np.array or string with the image
-    kernel_size: kernel size for morphological transforms
-    add_centroids: boolean for whether to add centroids to outline
-
-    Returns
-    -------
-
-    """
+def watershed(img, kernel_size):
     if type(img) == str:
         img = cv2.imread(img, 0)
 
@@ -47,26 +35,9 @@ def extract_sea_ice(img, kernel_size=9, add_centroids=False):
     _, markers, stats, centroids = cv2.connectedComponentsWithStats(centroid_masks, connectivity=8)
     markers = markers + 1
     markers[unknown == 255] = 0
-    img_col = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    img_fill = img_col.copy()
-    markers = cv2.watershed(img_col, markers)
-
-    # draw centroids
-    if add_centroids:
-        for cent in centroids[1:]:
-            cent = [int(ele) for ele in cent]
-            img_col[cent[1], cent[0]] = [255, 255, 255]
-            img_col = cv2.dilate(img_col, np.ones([5, 5]))
-
-    # draw edge and apply gaussian kernel
-    img_col[markers == -1] = [255, 255, 255]
-    img_col[0, :] = 0
-    img_col[img_col.shape[0] - 1, :] = 0
-    img_col[:, 0] = 0
-    img_col[:, img_col.shape[1] - 1] = 0
-    img_col = cv2.dilate(img_col, np.ones([3, 3]))
-    outline = cv2.cvtColor(img_col, cv2.COLOR_RGB2GRAY).astype(np.uint8)
-    outline = cv2.GaussianBlur(outline, (5, 5), 0)
+    img_fill = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    img_out = img_fill.copy()
+    markers = cv2.watershed(img_fill, markers)
 
     # extract filled shapes
     img_fill[markers != 1] = [255, 255, 255]
@@ -75,4 +46,40 @@ def extract_sea_ice(img, kernel_size=9, add_centroids=False):
     img_fill[img_fill.shape[0] - 1, :] = 0
     img_fill[:, 0] = 0
     img_fill[:, img_fill.shape[1] - 1] = 0
-    return {'outline': outline, 'mask': img_fill}
+    img_fill[img_fill < 255] = 0
+
+    # extract outlines
+    img_out[markers == -1] = [255, 255, 255]
+    img_out = cv2.cvtColor(img_out, cv2.COLOR_RGB2GRAY).astype(np.uint8)
+    img_out[0, :] = 0
+    img_out[img_out.shape[0] - 1, :] = 0
+    img_out[:, 0] = 0
+    img_out[:, img_out.shape[1] - 1] = 0
+    img_out = cv2.dilate(img_out, np.ones([3, 3]))
+    img_out[img_out < 255] = 0
+
+    return img_fill, img_out
+
+
+def extract_sea_ice(img, kernel_size=9, n_iter=3, get_outline=False):
+    """
+    Helper function to extract sea ice masks from panchromatic imagery
+    Parameters
+    ----------
+    img: np.array or string with the image
+    kernel_size: kernel size for morphological transforms
+    add_centroids: boolean for whether to add centroids to outline
+
+    Returns
+    -------
+
+    """
+    fill = np.zeros(img.shape)
+    outline = np.zeros(img.shape)
+    for _ in range(n_iter):
+        curr_fill, curr_outline = watershed(img, kernel_size)
+        fill = curr_fill + fill
+        outline = curr_outline + outline
+        img[fill == 255] = 0
+
+    return {'outline': outline, 'mask': fill}
