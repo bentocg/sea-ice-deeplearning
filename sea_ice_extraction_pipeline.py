@@ -77,7 +77,10 @@ class Patch:
         with rasterio.open(self.src_raster) as src:
             self.mask = src.read(1, window=self.window)
             self.transforms = src.window_transform(self.window)
-            self.crs = src.crs
+            if type(src.crs) == int:
+                self.crs = from_epsg(src.crs)
+            else:
+                self.crs = src.crs
 
     def extract_ice_pol(self):
         self.polygons, self.is_border = polygonize_raster(extract_sea_ice(self.mask),
@@ -118,8 +121,12 @@ class ShapefileWriter:
         file = self.current_file()
         with fiona.open(file, 'a') as layer:
             geometry = patch.geom
-            if self.crs != patch.crs:
-                geometry = transform(patch.crs, self.crs, *(geometry.coords[0]))
+            target_crs = patch.crs
+            if type(target_crs) == int:
+                target_crs = from_epsg(target_crs)
+            # TODO conversion to different CRS is not working currently
+            if self.crs != target_crs:
+                geometry = transform(target_crs, self.crs, *geometry.boundary.coords.xy)
             layer.write({
                 'geometry': mapping(geometry),
                 'properties': {
@@ -183,9 +190,9 @@ def main():
 
             # write center polygons and save border polygons to merge
             if curr.polygons:
-                for idx, state in enumerate(curr.is_border):
+                for idx, border in enumerate(curr.is_border):
                     pol = curr.polygons[idx]
-                    if state:
+                    if border:
                         pols.append(pol)
                     else:
                         writer.write_patch(
@@ -224,8 +231,13 @@ def main():
     # write output to shapefile
     for idx, scn in enumerate(results):
         for pol in list(scn.geometry):
-            writer.write_patch(
-                Floe(args.out_crs, pol, pol.area, os.path.basename(input_scenes[idx])))
+            if type(pol) != 'Polygon':
+                for subpol in pol:
+                    writer.write_patch(
+                        Floe(args.out_crs, subpol, subpol.area, os.path.basename(input_scenes[idx])))
+            else:
+                writer.write_patch(
+                    Floe(args.out_crs, pol, pol.area, os.path.basename(input_scenes[idx])))
 
     toc = time.time()
     print(
