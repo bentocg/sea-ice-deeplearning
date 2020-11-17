@@ -92,14 +92,16 @@ def train_net(net,
                     scheduler.step(val_score)
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
                     pred = torch.sigmoid(masks_pred)
-                    pred = (pred > 0.8).float()
+                    pred9 = (pred > 0.9).float()
+                    pred95 = (pred > 0.95).float()
                     logging.info('Validation Dice Coeff: {}'.format(val_score))
                     writer.add_scalar('Dice/test', val_score, global_step)
 
                     writer.add_images('images', 1 - imgs, global_step)
 
                     writer.add_images('masks/true', true_masks, global_step)
-                    writer.add_images('masks/pred', pred, global_step)
+                    writer.add_images('masks/pred_90%', pred9, global_step)
+                    writer.add_images('masks/pred_95%', pred95, global_step)
 
         if save_cp:
             try:
