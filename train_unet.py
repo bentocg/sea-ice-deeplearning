@@ -83,7 +83,7 @@ def train_net(net,
 
                 pbar.update(imgs.shape[0])
                 global_step += 1
-                if global_step % ((n_train + n_val) * 10 // (batch_size)) == 0:
+                if global_step % (n_train // batch_size) == 0:
                     for tag, value in net.named_parameters():
                         tag = tag.replace('.', '/')
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
