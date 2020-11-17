@@ -1,25 +1,23 @@
 import logging
+import os
 from glob import glob
 from os import listdir
 from os.path import splitext
 
 import numpy as np
+import pandas as pd
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
 
 class BasicDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir,  outline_dir=None, augmentation=None):
+    def __init__(self, imgs_dir, masks_dir,  labels_file, dataset='training', augmentation=None):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
-        if outline_dir:
-            self.outline_dir = outline_dir
-        else:
-            self.outline_dir = None
+        labels = pd.read_csv(labels_file)
 
-        self.ids = [splitext(file)[0] for file in listdir(imgs_dir)
-                    if not file.startswith('.')]
+        self.ids = [ele for ele in labels.loc[labels.dataset == dataset]]
         self.augmentation = augmentation
         logging.info(f'Creating dataset with {len(self.ids)} examples')
 
@@ -40,28 +38,19 @@ class BasicDataset(Dataset):
         mask_file = glob(self.masks_dir + idx + '.tif')
         img_file = glob(self.imgs_dir + idx + '.tif')
 
-        assert len(mask_file) == 1, \
-            f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
         assert len(img_file) == 1, \
             f'Either no image or multiple images found for the ID {idx}: {img_file}'
 
-        mask =self.preprocess(Image.open(mask_file[0]))
         img = self.preprocess(Image.open(img_file[0]))
+        if os.path.isfile(mask_file):
+            mask = self.preprocess(Image.open(mask_file[0]))
+        else:
+            mask = np.zeros(img.shape)
         mask[mask < 200] = 0
         mask[mask > 0] = 1
 
-
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
-
-        if self.outline_dir:
-            outline_file = glob(self.outline_dir + idx + '.tif')
-            assert len(outline_file) == 1, \
-                f'Either no outline or multiple outlines found for the ID {idx}: {outline_file}'
-            outline = Image.open(outline_file[0])
-
-        else:
-            outline = np.zeros(np.array(mask).shape)
 
         if self.augmentation:
             sample = self.augmentation(image=img, mask=mask)

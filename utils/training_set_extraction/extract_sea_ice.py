@@ -61,7 +61,7 @@ def watershed(img, kernel_size):
     return img_fill, img_out
 
 
-def extract_sea_ice(img, kernel_size=9, n_iter=3, get_outline=False):
+def extract_sea_ice(img, kernel_size=9, n_iter=10):
     """
     Helper function to extract sea ice masks from panchromatic imagery
     Parameters
@@ -82,4 +82,4 @@ def extract_sea_ice(img, kernel_size=9, n_iter=3, get_outline=False):
         outline = curr_outline + outline
         img[fill == 255] = 0
 
-    return {'outline': outline, 'mask': fill}
+    return {'outline': fill, 'mask': outline}

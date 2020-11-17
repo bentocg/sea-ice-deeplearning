@@ -6,4 +6,4 @@
 
 #TODO
 * Use a pyramid of scales instead of simple panchromatic imagery
-* Create inference pipeline
+* Create inference pipeline from imagery to shapefiles

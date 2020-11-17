@@ -11,6 +11,7 @@ from argparse import ArgumentParser
 from shapely.geometry import mapping
 
 import geopandas as gpd
+import cv2
 import rasterio
 import fiona
 from fiona.crs import from_epsg
@@ -57,12 +58,20 @@ def parse_args():
         help=
         "Boolean for whether the output shapefile will contain Polygons (large shapefile) or Polygon centroids + area (smaller file size)"
     )
+    parser.add_argument(
+        "--write_mask",
+        type=int,
+        default=1,
+        help=
+        "Boolean for whether to write mask outputs"
+    )
+
     return parser.parse_args()
 
 
 # Patch class for sea ice extraction
 class Patch:
-    def __init__(self, src_raster, col_off, row_off, patch_size=300):
+    def __init__(self, src_raster, col_off, row_off, patch_size=300, write_mask=True):
         self.src_raster = src_raster
         self.window = Window(col_off=col_off, row_off=row_off, width=patch_size, height=patch_size)
         self.row = int(row_off / patch_size)
@@ -72,15 +81,43 @@ class Patch:
         self.transforms = None
         self.polygons = False
         self.is_border = False
+        self.write_mask = write_mask
 
     def extract_mask(self):
         with rasterio.open(self.src_raster) as src:
-            self.mask = src.read(1, window=self.window)
+            self.mask = cv2.resize(src.read(1, window=self.window), dsize=(286, 286))
             self.transforms = src.window_transform(self.window)
             if type(src.crs) == int:
                 self.crs = from_epsg(src.crs)
             else:
                 self.crs = src.crs
+
+            if self.write_mask:
+                outname = f"patches/{os.path.basename(self.src_raster).split('.')[0]}_{self.row}_{self.col}.tiff"
+                with rasterio.open(outname,
+                                   mode='w',
+                                   driver='GTiff',
+                                   width=self.mask.shape[0],
+                                   height=self.mask.shape[1],
+                                   transform=self.transforms,
+                                   crs=self.crs,
+                                   count=1,
+                                   compress='lzw',
+                                   dtype=rasterio.uint8) as dst:
+                    dst.write(self.mask.reshape((1, self.mask.shape[0], self.mask.shape[1])))
+                outname = f"masks/{os.path.basename(self.src_raster).split('.')[0]}_{self.row}_{self.col}.tiff"
+                sea_ice_mask = extract_sea_ice(self.mask)
+                with rasterio.open(outname,
+                                   mode='w',
+                                   driver='GTiff',
+                                   width=self.mask.shape[0],
+                                   height=self.mask.shape[1],
+                                   transform=self.transforms,
+                                   crs=self.crs,
+                                   count=1,
+                                   compress='lzw',
+                                   dtype=rasterio.uint8) as dst:
+                    dst.write(sea_ice_mask.reshape((1, self.mask.shape[0], self.mask.shape[1])))
 
     def extract_ice_pol(self):
         self.polygons, self.is_border = polygonize_raster(extract_sea_ice(self.mask),
@@ -186,58 +223,66 @@ def main():
 
             # extract sea ice polygon
             curr.extract_mask()
-            curr.extract_ice_pol()
 
-            # write center polygons and save border polygons to merge
-            if curr.polygons:
-                for idx, border in enumerate(curr.is_border):
-                    pol = curr.polygons[idx]
-                    if border:
-                        pols.append(pol)
-                    else:
-                        writer.write_patch(
-                            Floe(curr.crs, pol, pol.area, os.path.basename(scene)))
+            if args.polygon:
+                curr.extract_ice_pol()
 
-        # merge polygons that span multiple patches and return dataframe
-        sea_ice = gpd.GeoDataFrame(geometry=pols,
-                                   crs=src_crs,
-                                   index=[ele for ele in range(len(pols))])
-        sea_ice = sea_ice.assign(geometry=sea_ice.buffer(0))
-        overlap_matrix = sea_ice.geometry.apply(lambda x: sea_ice.overlaps(x)).values.astype(int)
-        n, ids = connected_components(overlap_matrix)
-        sea_ice = sea_ice.assign(group=ids)
-        try:
-            sea_ice = sea_ice.dissolve(by='group')
-            sea_ice = sea_ice.to_crs(from_epsg(args.out_crs))
-        except:
-            print(sea_ice)
+                # write center polygons and save border polygons to merge
+                if curr.polygons:
+                    for idx, border in enumerate(curr.is_border):
+                        pol = curr.polygons[idx]
+                        if border:
+                            pols.append(pol)
+                        else:
+                            writer.write_patch(
+                                Floe(curr.crs, pol, pol.area, os.path.basename(scene)))
 
-        # return polygons or centroids
         if args.polygon:
-            return sea_ice
-        else:
-            sea_ice = sea_ice.assign(area=[pol.area for pol in list(sea_ice.geometry)])
-            sea_ice = sea_ice.assign(geometry=[pol.centroid for pol in list(sea_ice.geometry)])
-            return sea_ice
+            # merge polygons that span multiple patches and return dataframe
+            sea_ice = gpd.GeoDataFrame(geometry=pols,
+                                       crs=src_crs,
+                                       index=[ele for ele in range(len(pols))])
+            sea_ice = sea_ice.assign(geometry=sea_ice.buffer(0))
+            overlap_matrix = sea_ice.geometry.apply(lambda x: sea_ice.overlaps(x)).values.astype(int)
+            n, ids = connected_components(overlap_matrix)
+            sea_ice = sea_ice.assign(group=ids)
+            try:
+                sea_ice = sea_ice.dissolve(by='group')
+                sea_ice = sea_ice.to_crs(from_epsg(args.out_crs))
+            except:
+                print(sea_ice)
+
+            # return polygons or centroids
+            if args.polygon:
+                return sea_ice
+            else:
+                sea_ice = sea_ice.assign(area=[pol.area for pol in list(sea_ice.geometry)])
+                sea_ice = sea_ice.assign(geometry=[pol.centroid for pol in list(sea_ice.geometry)])
+                return sea_ice
 
     # create processing pool and process all input scenes in parallel
+    if args.write_mask:
+        for folder in ['masks', 'patches']:
+            os.makedirs(folder, exist_ok=True)
     if args.cores is not None:
         pool = Pool(args.cores)
     else:
         pool = Pool(cpu_count() - 1)
 
-    results = map(process_scene, input_scenes)
+    results = pool.map(process_scene, input_scenes)
 
     # write output to shapefile
-    for idx, scn in enumerate(results):
-        for pol in list(scn.geometry):
-            if type(pol) != 'Polygon':
-                for subpol in pol:
+    if args.polygon:
+        for idx, scn in enumerate(results):
+            for pol in list(scn.geometry):
+                try:
+                    len(pol)
+                    for subpol in pol:
+                        writer.write_patch(
+                            Floe(args.out_crs, subpol, subpol.area, os.path.basename(input_scenes[idx])))
+                except:
                     writer.write_patch(
-                        Floe(args.out_crs, subpol, subpol.area, os.path.basename(input_scenes[idx])))
-            else:
-                writer.write_patch(
-                    Floe(args.out_crs, pol, pol.area, os.path.basename(input_scenes[idx])))
+                        Floe(args.out_crs, pol, pol.area, os.path.basename(input_scenes[idx])))
 
     toc = time.time()
     print(

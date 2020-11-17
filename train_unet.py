@@ -15,11 +15,10 @@ from utils.data_handling import BasicDataset
 from utils.models import UNet
 from utils.data_handling import get_training_augmentation, get_validation_augmentation
 
-dir_img_train = 'training_set/training/x/'
-dir_mask_train = 'training_set/training/y_mask/'
-dir_img_val = 'training_set/validation/x/'
-dir_mask_val = 'training_set/validation/y_mask/'
-dir_checkpoint = 'checkpoints/'
+dir_img_train = 'training_set/x/'
+dir_mask_train = 'training_set/y/'
+dir_checkpoint = 'checkpoints'
+labels_file = 'training_set/classes.csv'
 
 
 def train_net(net,
@@ -31,8 +30,10 @@ def train_net(net,
               lr=0.001,
               save_cp=True,
               img_size=256):
-    train = BasicDataset(dir_img_train, dir_mask_train, augmentation=get_training_augmentation(img_size))
-    val = BasicDataset(dir_img_val, dir_mask_val, augmentation=get_validation_augmentation(img_size))
+    train = BasicDataset(dir_img_train, dir_mask_train, labels_file, dataset='training',
+                         augmentation=get_training_augmentation(img_size))
+    val = BasicDataset(dir_img_train, dir_mask_train, labels_file, dataset='validation',
+                       augmentation=get_validation_augmentation(img_size))
     n_train, n_val = len(train), len(val)
 
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
