@@ -131,7 +131,7 @@ def get_args():
                         help='Load model from a .pth file')
     parser.add_argument('-s', '--img_size', dest='size', type=int, default=256,
                         help='Final size of images')
-    parser.add_argument('-w', '--pos_weight', dest='weight', type=int, default=256,
+    parser.add_argument('-w', '--pos_weight', dest='weight', type=int, default=5,
                         help='weight for positive samples')
 
     return parser.parse_args()
