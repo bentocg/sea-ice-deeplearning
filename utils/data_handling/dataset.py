@@ -17,7 +17,7 @@ class BasicDataset(Dataset):
         self.masks_dir = masks_dir
         labels = pd.read_csv(labels_file)
 
-        self.ids = [ele for ele in labels.loc[labels.dataset == dataset]]
+        self.ids = [ele for ele in labels.loc[labels.dataset == dataset, 'image']]
         self.augmentation = augmentation
         logging.info(f'Creating dataset with {len(self.ids)} examples')
 
