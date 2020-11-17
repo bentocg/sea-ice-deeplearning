@@ -42,7 +42,7 @@ class BasicDataset(Dataset):
             f'Either no image or multiple images found for the ID {idx}: {img_file}'
 
         img = self.preprocess(Image.open(img_file[0]))
-        if os.path.isfile(mask_file):
+        if len(mask_file) == 1:
             mask = self.preprocess(Image.open(mask_file[0]))
         else:
             mask = np.zeros(img.shape)
