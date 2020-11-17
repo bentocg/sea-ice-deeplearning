@@ -92,6 +92,7 @@ def train_net(net,
                     scheduler.step(val_score)
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
                     pred = torch.sigmoid(masks_pred)
+                    pred = (pred > 0.8).float()
                     pred9 = (pred > 0.9).float()
                     pred95 = (pred > 0.95).float()
                     logging.info('Validation Dice Coeff: {}'.format(val_score))
@@ -100,6 +101,7 @@ def train_net(net,
                     writer.add_images('images', 1 - imgs, global_step)
 
                     writer.add_images('masks/true', true_masks, global_step)
+                    writer.add_images('masks/pred_80%', pred, global_step)
                     writer.add_images('masks/pred_90%', pred9, global_step)
                     writer.add_images('masks/pred_95%', pred95, global_step)
 
@@ -129,6 +131,8 @@ def get_args():
                         help='Load model from a .pth file')
     parser.add_argument('-s', '--img_size', dest='size', type=int, default=256,
                         help='Final size of images')
+    parser.add_argument('-w', '--pos_weight', dest='weight', type=int, default=256,
+                        help='weight for positive samples')
 
     return parser.parse_args()
 
@@ -158,6 +162,7 @@ if __name__ == '__main__':
                   batch_size=args.batchsize,
                   lr=args.lr,
                   device=device,
+                  pos_weight=args.weight,
                   img_size=args.size)
     except KeyboardInterrupt:
         torch.save(net.state_dict(), 'INTERRUPTED.pth')
