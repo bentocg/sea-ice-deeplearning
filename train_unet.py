@@ -61,6 +61,9 @@ def train_net(net,
     for epoch in range(epochs):
         net.train()
 
+        if epochs - epoch == 5:
+            train.only_positive()
+            train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
         epoch_loss = 0
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:

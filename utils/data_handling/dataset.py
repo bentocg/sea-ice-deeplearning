@@ -16,13 +16,16 @@ class BasicDataset(Dataset):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         labels = pd.read_csv(labels_file)
-
+        self.labels = [ele for ele in labels.loc[labels.dataset == dataset, 'label']]
         self.ids = [ele for ele in labels.loc[labels.dataset == dataset, 'image']]
         self.augmentation = augmentation
         logging.info(f'Creating dataset with {len(self.ids)} examples')
 
     def __len__(self):
         return len(self.ids)
+
+    def only_positive(self):
+        self.ids = [ele for idx, ele in enumerate(self.ids) if self.labels[idx] == 'positive_easy']
 
     @classmethod
     def preprocess(cls, pil_img):
