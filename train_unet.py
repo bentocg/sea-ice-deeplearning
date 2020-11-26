@@ -13,6 +13,7 @@ from tqdm import tqdm
 from eval import eval_net
 from utils.data_handling import BasicDataset
 from utils.models import UNet
+from .dice_loss import MixedLoss
 from utils.data_handling import get_training_augmentation, get_validation_augmentation
 
 dir_img_train = 'training_set/x/'
@@ -57,7 +58,7 @@ def train_net(net,
 
     optimizer = optim.Adam(net.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=25)
-    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.FloatTensor([pos_weight]).cuda())
+    criterion = MixedLoss(alpha=10, gamma=2)
     for epoch in range(epochs):
         net.train()
 

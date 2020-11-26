@@ -1,42 +1,45 @@
 import torch
-from torch.autograd import Function
+from torch import nn
+from torch import functional as F
 
 
-class DiceCoeff(Function):
-    """Dice coeff for individual examples"""
+def dice_loss(input, target):
+    input = torch.sigmoid(input)
+    smooth = 1.0
+
+    iflat = input.view(-1)
+    tflat = target.view(-1)
+    intersection = (iflat * tflat).sum()
+
+    return ((2.0 * intersection + smooth) / (iflat.sum() + tflat.sum() + smooth))
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma):
+        super().__init__()
+        self.gamma = gamma
 
     def forward(self, input, target):
-        self.save_for_backward(input, target)
-        eps = 0.0001
-        self.inter = torch.dot(input.view(-1), target.view(-1))
-        self.union = torch.sum(input) + torch.sum(target) + eps
+        if not (target.size() == input.size()):
+            raise ValueError("Target size ({}) must be the same as input size ({})"
+                             .format(target.size(), input.size()))
 
-        t = (2 * self.inter.float() + eps) / self.union.float()
-        return t
+        max_val = (-input).clamp(min=0)
+        loss = input - input * target + max_val + \
+               ((-max_val).exp() + (-input - max_val).exp()).log()
 
-    # This function has only a single output, so it gets only one gradient
-    def backward(self, grad_output):
+        invprobs = F.logsigmoid(-input * (target * 2.0 - 1.0))
+        loss = (invprobs * self.gamma).exp() * loss
 
-        input, target = self.saved_variables
-        grad_input = grad_target = None
-
-        if self.needs_input_grad[0]:
-            grad_input = grad_output * 2 * (target * self.union - self.inter) \
-                         / (self.union * self.union)
-        if self.needs_input_grad[1]:
-            grad_target = None
-
-        return grad_input, grad_target
+        return loss.mean()
 
 
-def dice_coeff(input, target):
-    """Dice coeff for batches"""
-    if input.is_cuda:
-        s = torch.FloatTensor(1).cuda().zero_()
-    else:
-        s = torch.FloatTensor(1).zero_()
+class MixedLoss(nn.Module):
+    def __init__(self, alpha, gamma):
+        super().__init__()
+        self.alpha = alpha
+        self.focal = FocalLoss(gamma)
 
-    for i, c in enumerate(zip(input, target)):
-        s = s + DiceCoeff().forward(c[0], c[1])
-
-    return s / (i + 1)
+    def forward(self, input, target):
+        loss = self.alpha * self.focal(input, target) - torch.log(dice_loss(input, target))
+        return loss.mean()
