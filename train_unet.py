@@ -13,7 +13,7 @@ from tqdm import tqdm
 from eval import eval_net
 from utils.data_handling import BasicDataset
 from utils.models import UNet
-from .dice_loss import MixedLoss
+from dice_loss import MixedLoss
 from utils.data_handling import get_training_augmentation, get_validation_augmentation
 
 dir_img_train = 'training_set/x/'
